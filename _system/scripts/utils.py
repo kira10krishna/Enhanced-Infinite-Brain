@@ -62,34 +62,39 @@ def parse_frontmatter(content):
             if val_str == "" and i + 1 < len(lines) and (lines[i+1].strip().startswith('-') or lines[i+1].startswith('  ')):
                 items = []
                 i += 1
-                while i < len(lines) and (lines[i].startswith('  ') or lines[i].startswith('\t') or not lines[i].strip()):
-                    subline = lines[i].strip()
-                    if subline.startswith('-'):
-                        item_content = subline[1:].strip()
-                        if item_content == "":
-                            # dict list (like edges)
-                            d = {}
-                            i += 1
-                            while i < len(lines) and (lines[i].startswith('    ') or lines[i].startswith('\t\t') or lines[i].strip() == ""):
-                                subsubline = lines[i].strip()
-                                if subsubline and not subsubline.startswith('#'):
-                                    s_parts = subsubline.split(':', 1)
-                                    if len(s_parts) == 2:
-                                        s_k = s_parts[0].strip()
-                                        s_v = parse_val(s_parts[1].strip())
-                                        d[s_k] = s_v
-                                i += 1
-                            # step back to let the outer loop advance appropriately
-                            i -= 1
-                            items.append(d)
-                        else:
-                            items.append(parse_val(item_content))
-                    elif subline == "":
-                        pass
+                list_lines = []
+                while i < len(lines) and (lines[i].startswith('  ') or lines[i].startswith('\t') or not lines[i].strip() or lines[i].strip().startswith('-')):
+                    if lines[i].strip() and not lines[i].startswith(' ') and not lines[i].startswith('\t') and not lines[i].strip().startswith('-'):
+                        break
+                    list_lines.append(lines[i])
                     i += 1
-                fm[key] = items
-                # step back by 1 because the outer loop will increment
                 i -= 1
+                
+                current_dict = None
+                for l in list_lines:
+                    l_strip = l.strip()
+                    if not l_strip or l_strip.startswith('#'):
+                        continue
+                    if l_strip.startswith('-'):
+                        item_val = l_strip[1:].strip()
+                        is_key_value = bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_-]*\s*:(?:\s|$)', item_val))
+                        if is_key_value:
+                            current_dict = {}
+                            items.append(current_dict)
+                            s_parts = item_val.split(':', 1)
+                            current_dict[s_parts[0].strip()] = parse_val(s_parts[1].strip())
+                        elif item_val == "":
+                            current_dict = {}
+                            items.append(current_dict)
+                        else:
+                            current_dict = None
+                            items.append(parse_val(item_val))
+                    else:
+                        if current_dict is not None:
+                            s_parts = l_strip.split(':', 1)
+                            if len(s_parts) == 2:
+                                current_dict[s_parts[0].strip()] = parse_val(s_parts[1].strip())
+                fm[key] = items
             else:
                 fm[key] = parse_val(val_str)
         i += 1

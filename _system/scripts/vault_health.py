@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import argparse
 from datetime import datetime
@@ -181,7 +182,14 @@ def run_health(auto=False):
     if os.path.isfile(contr_path):
         with open(contr_path, 'r', encoding='utf-8') as f:
             contr_content = f.read()
-        open_contr_count = len(re.findall(r"Status:\s*open", contr_content, re.IGNORECASE))
+        active_idx = contr_content.find("## Active Contradictions")
+        if active_idx != -1:
+            resolved_idx = contr_content.find("## Resolved Contradictions", active_idx)
+            if resolved_idx != -1:
+                active_section = contr_content[active_idx:resolved_idx]
+            else:
+                active_section = contr_content[active_idx:]
+            open_contr_count = len(re.findall(r"Status:\s*open", active_section, re.IGNORECASE))
 
     # 6. Generate HEALTH-REPORT.md
     report_path = os.path.join(VAULT_DIR, "_system", "HEALTH-REPORT.md")

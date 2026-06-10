@@ -97,7 +97,17 @@ def decompose_with_llm(text, source_id, model):
         with urllib.request.urlopen(req, timeout=90) as response:
             res = json.loads(response.read().decode('utf-8'))
             resp_text = res.get("response", "")
-            return json.loads(resp_text)
+            data = json.loads(resp_text)
+            if isinstance(data, dict):
+                if "id" in data or "title" in data:
+                    return [data]
+                for val in data.values():
+                    if isinstance(val, list):
+                        if val and isinstance(val[0], dict) and ("id" in val[0] or "title" in val[0]):
+                            return val
+            elif isinstance(data, list):
+                return data
+            return fallback_decomposition(text, source_id)
     except Exception as e:
         print(f"Ollama decomposition failed: {e}")
         return None
