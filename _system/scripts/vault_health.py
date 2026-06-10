@@ -30,8 +30,8 @@ def run_health(auto=False):
     print("Running Vault Health Audit...")
     current_date = datetime.now()
     
-    # 1. Load all nodes
-    nodes = utils.get_all_nodes(VAULT_DIR)
+    # 1. Load all nodes (metadata-only for maximum speed)
+    nodes = utils.get_all_nodes(VAULT_DIR, metadata_only=True)
     
     # Pre-map edges to detect orphans
     # Maps node_id/path to list of inbound nodes
@@ -163,8 +163,10 @@ def run_health(auto=False):
                 
         if apply_decay:
             for file_path, fm, body, old_conf, new_conf, months in decay_proposals:
+                # Load the full node to retrieve body context before writing updates
+                _, actual_body = utils.read_node(file_path, metadata_only=False)
                 fm["confidence"] = new_conf
-                utils.write_node(file_path, fm, body)
+                utils.write_node(file_path, fm, actual_body)
                 updates_applied += 1
             print(f"Applied confidence decay to {updates_applied} nodes.")
         else:

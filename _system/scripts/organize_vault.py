@@ -8,7 +8,7 @@ VAULT_DIR = "/Users/kira/Documents/Brains/Knowledge"
 def audit_vault():
     print("Auditing vault structure...")
     current_date = datetime.now()
-    nodes = utils.get_all_nodes(VAULT_DIR)
+    nodes = utils.get_all_nodes(VAULT_DIR, metadata_only=True)
     
     orphans = []
     mismatches = []
@@ -157,7 +157,9 @@ def audit_vault():
                 edges = fm.get("edges", [])
                 new_edges = [edge for edge in edges if edge.get("target") != target]
                 fm["edges"] = new_edges
-                utils.write_node(file_path, fm, body)
+                # Load the full node to retrieve body context before writing updates
+                _, actual_body = utils.read_node(file_path, metadata_only=False)
+                utils.write_node(file_path, fm, actual_body)
                 print(f"  Removed edge to '{target}' in [[{source_relpath}]]")
                 actions_taken.append(f"Removed broken edge {source_relpath} -> {target}")
 

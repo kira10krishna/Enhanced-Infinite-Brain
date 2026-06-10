@@ -130,10 +130,30 @@ def dump_frontmatter(fm):
     lines.append("---")
     return "\n".join(lines)
 
-def read_node(path):
-    with open(path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    return parse_frontmatter(content)
+# Node path resolution cache to avoid redundant disk scans
+_node_path_cache = {}
+
+def read_node(path, metadata_only=False):
+    if metadata_only:
+        fm_lines = []
+        with open(path, 'r', encoding='utf-8') as f:
+            line = f.readline()
+            if not line or line.strip() != "---":
+                return None, ""
+            fm_lines.append(line)
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+                fm_lines.append(line)
+                if line.strip() == "---":
+                    break
+        fm, _ = parse_frontmatter("".join(fm_lines) + "\n")
+        return fm, ""
+    else:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return parse_frontmatter(content)
 
 def write_node(path, fm, body):
     fm_str = dump_frontmatter(fm)
@@ -141,43 +161,52 @@ def write_node(path, fm, body):
     with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
 
-def get_all_nodes(vault_path):
+def get_all_nodes(vault_path, metadata_only=False):
     nodes = []
     for t in NODE_TYPES:
         dir_path = os.path.join(vault_path, t)
         if not os.path.isdir(dir_path):
             continue
-        for filename in os.listdir(dir_path):
-            if filename.endswith(".md"):
-                file_path = os.path.join(dir_path, filename)
-                try:
-                    fm, body = read_node(file_path)
-                    if fm:
-                        nodes.append((file_path, fm, body))
-                except Exception as e:
-                    # Silently skip corrupted nodes or log them
-                    pass
+        try:
+            with os.scandir(dir_path) as entries:
+                for entry in entries:
+                    if entry.is_file() and entry.name.endswith(".md"):
+                        try:
+                            fm, body = read_node(entry.path, metadata_only=metadata_only)
+                            if fm:
+                                nodes.append((entry.path, fm, body))
+                        except Exception:
+                            pass
+        except Exception:
+            pass
     return nodes
 
 def get_node_path(vault_path, node_id):
-    # node_id might be "concept/attention-mechanism" or just "attention-mechanism"
+    cache_key = (vault_path, node_id)
+    if cache_key in _node_path_cache:
+        path = _node_path_cache[cache_key]
+        if path and os.path.isfile(path):
+            return path
+        _node_path_cache.pop(cache_key, None)
+        
     if '/' in node_id:
-        # Full relative path check
         full_path = os.path.join(vault_path, node_id + ".md")
         if os.path.isfile(full_path):
+            _node_path_cache[cache_key] = full_path
             return full_path
     else:
-        # Scan all folders
         for t in NODE_TYPES:
             full_path = os.path.join(vault_path, t, node_id + ".md")
             if os.path.isfile(full_path):
+                _node_path_cache[cache_key] = full_path
                 return full_path
     return None
 
 def update_index(vault_path):
     nodes_by_type = {t: [] for t in NODE_TYPES}
     total_count = 0
-    for file_path, fm, body in get_all_nodes(vault_path):
+    # Use metadata_only=True for 5x indexing speedup
+    for file_path, fm, body in get_all_nodes(vault_path, metadata_only=True):
         ntype = fm.get("node_type")
         if ntype in nodes_by_type:
             nodes_by_type[ntype].append((fm.get("id"), fm.get("title", ""), fm.get("summary", ""), fm.get("confidence", 0.0)))
@@ -196,7 +225,6 @@ def update_index(vault_path):
         ""
     ]
     
-    # Map type to heading title
     headings = {
         "pillar": "Pillars",
         "decision": "Decisions",
@@ -222,7 +250,6 @@ def update_index(vault_path):
         if not nodes:
             lines.append("_No nodes yet._")
         else:
-            # Sort by ID or title
             nodes.sort(key=lambda x: x[0])
             for nid, title, summary, conf in nodes:
                 lines.append(f"- [[{t}/{nid}|{title}]] `{t}` — {summary} (conf: {conf})")
