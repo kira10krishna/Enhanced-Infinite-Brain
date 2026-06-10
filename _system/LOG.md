@@ -6,6 +6,33 @@ All vault operations are recorded here in reverse-chronological order (newest fi
 
 ---
 
+## [2026-06-11] query-vault | "Query: What is the attention mechanis..." | mode=auto
+- Query: "What is the attention mechanism?"
+- Keywords extracted: ['attention', 'mechanism']
+- Retrieved 2 nodes for context
+
+## [2026-06-11] query-vault | "Query: What is the attention mechanis..." | mode=auto
+- Query: "What is the attention mechanism?"
+- Keywords extracted: ['attention', 'mechanism']
+- Retrieved 2 nodes for context
+
+## [2026-06-11] vault-health | "Vault Health Audit" | mode=auto
+- Scan complete: 2 nodes audited
+- Confidence decay applied to 0 nodes
+- Detected 0 orphans and 0 stale nodes
+- Health report updated at `_system/HEALTH-REPORT.md`
+
+## [2026-06-11] query-vault | "Query: What is the attention mechanis..." | mode=auto
+- Query: "What is the attention mechanism?"
+- Keywords extracted: ['attention', 'mechanism']
+- Retrieved 2 nodes for context
+
+## [2026-06-11] vault-health | "Vault Health Audit" | mode=auto
+- Scan complete: 2 nodes audited
+- Confidence decay applied to 0 nodes
+- Detected 0 orphans and 0 stale nodes
+- Health report updated at `_system/HEALTH-REPORT.md`
+
 ## [2026-06-11] vault-health | "Vault Health Audit" | mode=auto
 - Scan complete: 2 nodes audited
 - Confidence decay applied to 0 nodes

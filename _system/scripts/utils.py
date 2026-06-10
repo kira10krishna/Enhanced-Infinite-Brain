@@ -8,13 +8,24 @@ NODE_TYPES = [
     "note", "contact", "reference", "custom"
 ]
 
+# Pre-compiled regular expressions for optimized matching
+RE_VAL_QUOTED = re.compile(r'^["\'](.*)["\']$')
+RE_VAL_LIST = re.compile(r'^\[(.*)\]$')
+RE_VAL_FLOAT = re.compile(r'^-?\d+\.\d+$')
+RE_VAL_INT = re.compile(r'^-?\d+$')
+RE_VAL_SPLIT_COMMAS = re.compile(r',\s*(?=(?:[^"]*"[^"]*")*[^"]*$)')
+
+RE_FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+RE_TOP_LEVEL_KEY = re.compile(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$', re.MULTILINE)
+RE_BLOCK_KV = re.compile(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$')
+
 def parse_val(val_str):
     val_str = val_str.strip()
     if not val_str:
         return ""
     
-    # Match quoted string: "value" or 'value'
-    m_str = re.match(r'^["\'](.*)["\']$', val_str)
+    # Match quoted string
+    m_str = RE_VAL_QUOTED.match(val_str)
     if m_str:
         return m_str.group(1).replace('\\"', '"')
         
@@ -25,32 +36,32 @@ def parse_val(val_str):
     if val_str == "[]":
         return []
         
-    # Match inline list: [item1, item2, ...]
-    m_list = re.match(r'^\[(.*)\]$', val_str)
+    # Match inline list
+    m_list = RE_VAL_LIST.match(val_str)
     if m_list:
         inner = m_list.group(1).strip()
         if not inner:
             return []
-        parts = re.split(r',\s*(?=(?:[^"]*"[^"]*")*[^"]*$)', inner)
+        parts = RE_VAL_SPLIT_COMMAS.split(inner)
         return [parse_val(x) for x in parts]
         
     # Match numeric values
-    if re.match(r'^-?\d+\.\d+$', val_str):
+    if RE_VAL_FLOAT.match(val_str):
         return float(val_str)
-    if re.match(r'^-?\d+$', val_str):
+    if RE_VAL_INT.match(val_str):
         return int(val_str)
         
     return val_str
 
 def parse_frontmatter(content):
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    match = RE_FRONTMATTER.match(content)
     if not match:
         return None, content
     fm_text = match.group(1).replace('\r', '')
     body = content[match.end():]
     
     # Match all top-level keys
-    top_level_matches = list(re.finditer(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$', fm_text, re.MULTILINE))
+    top_level_matches = list(RE_TOP_LEVEL_KEY.finditer(fm_text))
     
     fm = {}
     for idx, m in enumerate(top_level_matches):
@@ -71,7 +82,7 @@ def parse_frontmatter(content):
                     continue
                 if line_strip.startswith('-'):
                     item_val = line_strip[1:].strip()
-                    m_kv = re.match(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$', item_val)
+                    m_kv = RE_BLOCK_KV.match(item_val)
                     if m_kv:
                         d = {m_kv.group(1): parse_val(m_kv.group(2))}
                         items.append(d)
@@ -80,7 +91,7 @@ def parse_frontmatter(content):
                     else:
                         items.append(parse_val(item_val))
                 else:
-                    m_kv = re.match(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$', line_strip)
+                    m_kv = RE_BLOCK_KV.match(line_strip)
                     if m_kv and items and isinstance(items[-1], dict):
                         items[-1][m_kv.group(1)] = parse_val(m_kv.group(2))
             fm[key] = items

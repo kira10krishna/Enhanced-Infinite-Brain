@@ -8,6 +8,7 @@ from datetime import datetime
 import utils
 
 VAULT_DIR = "/Users/kira/Documents/Brains/Knowledge"
+RE_CLEAN_TEXT = re.compile(r'[^\w\s-]')
 
 DECOMPOSITION_PROMPT = """You are a Knowledge Graph Architect.
 Your task is to analyze the following source text and decompose it into a set of atomic, typed knowledge graph nodes.
@@ -123,7 +124,7 @@ def fallback_decomposition(text, source_id):
             break
             
     summary = text[:100].replace('\n', ' ') + "..."
-    clean_title = re.sub(r'[^\w\s-]', '', title)
+    clean_title = RE_CLEAN_TEXT.sub('', title)
     node_id = clean_title.lower().replace(' ', '-')
     if not node_id:
         node_id = "extracted-note-" + datetime.now().strftime("%H%M%S")
@@ -160,7 +161,7 @@ def process_ingest(source_path, mode="supervised", json_payload_path=None):
         content = source_path
         source_title = "Pasted Raw Text"
         
-    source_id = re.sub(r'[^\w\s-]', '', os.path.splitext(source_title)[0]).lower().replace(' ', '-')
+    source_id = RE_CLEAN_TEXT.sub('', os.path.splitext(source_title)[0]).lower().replace(' ', '-')
     if not source_id:
         source_id = "raw-source-" + datetime.now().strftime("%Y%m%d-%H%M%S")
         

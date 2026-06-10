@@ -6,6 +6,10 @@ import utils
 
 VAULT_DIR = "/Users/kira/Documents/Brains/Knowledge"
 
+# Compiled regex patterns for speed optimization
+RE_CLEAN_QUERY = re.compile(r'[^\w\s-]')
+RE_INDEX_ENTRY = re.compile(r'^-\s*\[\[([^/|\]]+)/([^|\]]+)(?:\|([^\]]+))?\]\]\s*`?(\w+)`?\s*—\s*(.*?)\s*\(conf:\s*([0-9.]+)\)$')
+
 STOPWORDS = {
     "what", "is", "how", "why", "the", "a", "an", "and", "or", "but", "in", "on", "at", 
     "to", "for", "with", "about", "against", "between", "into", "through", "during", 
@@ -20,7 +24,7 @@ STOPWORDS = {
 }
 
 def extract_keywords(query):
-    query_clean = re.sub(r'[^\w\s-]', ' ', query.lower())
+    query_clean = RE_CLEAN_QUERY.sub(' ', query.lower())
     words = query_clean.split()
     keywords = [w for w in words if w not in STOPWORDS and len(w) > 1]
     return keywords if keywords else words
@@ -33,23 +37,18 @@ def score_node(fm, keywords):
     tags = [t.lower() for t in fm.get("tags", []) if isinstance(t, str)]
     
     for kw in keywords:
-        # Title match (highest weight)
         if kw in title:
             score += 3.0
             if title.startswith(kw):
                 score += 1.0
-        # ID match
         if kw in nid:
             score += 2.0
-        # Tags match
         for tag in tags:
             if kw in tag:
                 score += 1.5
-        # Summary match
         if kw in summary:
             score += 1.0
             
-    # Apply confidence scaling (higher confidence nodes are preferred)
     score *= (0.5 + fm.get("confidence", 0.0) * 0.5)
     return score
 
@@ -58,42 +57,63 @@ def run_query(query, limit=5):
     keywords = extract_keywords(query)
     print(f"Keywords: {', '.join(keywords)}\n")
     
-    # 1. Load all nodes
-    nodes = utils.get_all_nodes(VAULT_DIR)
-    if not nodes:
-        print("The vault is empty. No nodes found to query.")
-        return
+    # 1. Attempt to load nodes from INDEX.md to avoid scanning disk (algorithmic optimization)
+    index_path = os.path.join(VAULT_DIR, "_system", "INDEX.md")
+    index_nodes = []
+    
+    if os.path.isfile(index_path):
+        with open(index_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                m = RE_INDEX_ENTRY.match(line.strip())
+                if m:
+                    ntype, nid, title, _, summary, conf = m.groups()
+                    fm = {
+                        "id": nid,
+                        "title": title if title else nid,
+                        "node_type": ntype,
+                        "summary": summary,
+                        "confidence": float(conf),
+                        "tags": []
+                    }
+                    index_nodes.append(fm)
+                    
+    # 2. Score candidate nodes
+    seeds = []
+    if index_nodes:
+        scored_index_nodes = []
+        for fm in index_nodes:
+            score = score_node(fm, keywords)
+            if score > 0.0:
+                scored_index_nodes.append((score, fm))
+        scored_index_nodes.sort(key=lambda x: x[0], reverse=True)
         
-    # Map nodes by relpath and short ID
-    node_map = {}
-    relpath_map = {}
-    for file_path, fm, body in nodes:
-        nid = fm.get("id")
-        ntype = fm.get("node_type")
-        relpath = f"{ntype}/{nid}"
-        node_map[nid] = (file_path, fm, body)
-        relpath_map[relpath] = (file_path, fm, body)
+        # Load details from disk ONLY for the top seed candidates
+        for score, fm in scored_index_nodes[:3]:
+            nid = fm["id"]
+            path = utils.get_node_path(VAULT_DIR, nid)
+            if path:
+                try:
+                    actual_fm, body = utils.read_node(path)
+                    seeds.append((score, path, actual_fm, body))
+                except Exception:
+                    pass
+    else:
+        # Fallback to loading all nodes from disk if INDEX.md is missing/empty
+        print("Warning: INDEX.md is empty or missing. Falling back to disk scan...")
+        nodes = utils.get_all_nodes(VAULT_DIR)
+        scored_nodes = []
+        for file_path, fm, body in nodes:
+            score = score_node(fm, keywords)
+            if score > 0.0:
+                scored_nodes.append((score, file_path, fm, body))
+        scored_nodes.sort(key=lambda x: x[0], reverse=True)
+        seeds = scored_nodes[:3]
 
-    # 2. Score all nodes
-    scored_nodes = []
-    for file_path, fm, body in nodes:
-        score = score_node(fm, keywords)
-        if score > 0.0:
-            scored_nodes.append((score, file_path, fm, body))
-            
-    # Sort by score descending
-    scored_nodes.sort(key=lambda x: x[0], reverse=True)
-    
-    # If no keywords matched, take nodes with highest confidence or recent updates
-    if not scored_nodes:
-        print("No direct keyword matches found. Showing highest-confidence nodes.")
-        for file_path, fm, body in nodes[:limit]:
-            scored_nodes.append((0.0, file_path, fm, body))
-            
-    # 3. Identify seed candidate nodes
-    seeds = scored_nodes[:3] # Top 3 seeds
-    
-    # 4. Traverse edges from seeds to find supporting context (1 hop)
+    if not seeds:
+        print("No matching candidate nodes found.")
+        return
+
+    # 3. Traverse edges from seeds to find supporting context (1 hop)
     traversed_relpaths = set()
     traversed_nodes = []
     
@@ -104,9 +124,8 @@ def run_query(query, limit=5):
         
         if relpath not in traversed_relpaths:
             traversed_relpaths.add(relpath)
-            traversed_nodes.append((score + 5.0, file_path, fm, body, "seed")) # Add seed bump
+            traversed_nodes.append((score + 5.0, file_path, fm, body, "seed"))
             
-        # Traverse edges
         edges = fm.get("edges", [])
         for edge in edges:
             target = edge.get("target", "")
@@ -114,42 +133,48 @@ def run_query(query, limit=5):
             if not target:
                 continue
                 
-            # Resolve target relpath
             target_relpath = target
             if '/' not in target_relpath:
-                # Resolve short ID
                 tpath = utils.get_node_path(VAULT_DIR, target_relpath)
                 if tpath:
                     target_relpath = tpath.replace(VAULT_DIR + "/", "").replace(".md", "")
                     
-            if target_relpath in relpath_map and target_relpath not in traversed_relpaths:
-                t_file, t_fm, t_body = relpath_map[target_relpath]
-                # Score target node
-                t_score = score_node(t_fm, keywords)
-                edge_weight = edge.get("weight", 0.5)
-                # Combined score: seed's score * weight + target's keyword score
-                combined_score = (score * edge_weight) + t_score
-                
-                traversed_relpaths.add(target_relpath)
-                traversed_nodes.append((combined_score, t_file, t_fm, t_body, f"edge ({etype} from {relpath})"))
+            if target_relpath not in traversed_relpaths:
+                tpath = utils.get_node_path(VAULT_DIR, target_relpath)
+                if tpath:
+                    try:
+                        t_fm, t_body = utils.read_node(tpath)
+                        t_score = score_node(t_fm, keywords)
+                        edge_weight = edge.get("weight", 0.5)
+                        combined_score = (score * edge_weight) + t_score
+                        
+                        traversed_relpaths.add(target_relpath)
+                        traversed_nodes.append((combined_score, tpath, t_fm, t_body, f"edge ({etype} from {relpath})"))
+                    except Exception:
+                        pass
 
-    # 5. Pillar Auto-Injection
-    # Check for any pillar nodes that match keywords or general topics
-    for file_path, fm, body in nodes:
+    # 4. Pillar Auto-Injection from index references
+    for fm in index_nodes if index_nodes else []:
         if fm.get("node_type") == "pillar":
             nid = fm.get("id")
             relpath = f"pillar/{nid}"
             if relpath not in traversed_relpaths:
                 p_score = score_node(fm, keywords)
                 if p_score > 0.0 or any(kw in nid for kw in keywords):
-                    traversed_relpaths.add(relpath)
-                    traversed_nodes.append((p_score + 10.0, file_path, fm, body, "pillar_injection"))
+                    tpath = utils.get_node_path(VAULT_DIR, nid)
+                    if tpath:
+                        try:
+                            p_fm, p_body = utils.read_node(tpath)
+                            traversed_relpaths.add(relpath)
+                            traversed_nodes.append((p_score + 10.0, tpath, p_fm, p_body, "pillar_injection"))
+                        except Exception:
+                            pass
 
     # Sort traversed context by score descending
     traversed_nodes.sort(key=lambda x: x[0], reverse=True)
     final_context_nodes = traversed_nodes[:limit]
     
-    # 6. Output formatted context block
+    # 5. Output formatted context block
     print(f"=== RETRIEVED CONTEXT (Top {len(final_context_nodes)} nodes) ===\n")
     
     for i, (score, file_path, fm, body, reason) in enumerate(final_context_nodes, 1):
@@ -176,7 +201,6 @@ def run_query(query, limit=5):
     print("Please synthesize an answer to the query using ONLY the retrieved context above.")
     print("For every claim made, append a lineage citation in this exact format:")
     print("`Based on [[type/node-id]] (confidence: C, derived from [[source/citation-source]], verified YYYY-MM-DD)`")
-    print("Where source/citation-source is the parent source node in the derived_from chain.")
     
     # Log the query operation
     log_details = [

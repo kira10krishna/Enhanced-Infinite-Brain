@@ -1,11 +1,13 @@
 import os
 import sys
+from datetime import datetime
 import utils
 
 VAULT_DIR = "/Users/kira/Documents/Brains/Knowledge"
 
 def audit_vault():
     print("Auditing vault structure...")
+    current_date = datetime.now()
     nodes = utils.get_all_nodes(VAULT_DIR)
     
     orphans = []
@@ -60,7 +62,6 @@ def audit_vault():
                 weak_edges.append((relpath, target))
                 
             # Broken edge check
-            # Verify if target exists as a file
             target_resolved = utils.get_node_path(VAULT_DIR, target)
             if not target_resolved:
                 broken_edges.append((relpath, target, file_path, fm, body))
@@ -71,7 +72,7 @@ def audit_vault():
         ntype = fm.get("node_type")
         relpath = f"{ntype}/{nid}"
         
-        # 1. Type mismatch check: does file folder match node_type?
+        # 1. Type mismatch check
         folder = os.path.basename(os.path.dirname(file_path))
         if folder != ntype:
             mismatches.append((file_path, folder, ntype, fm, body))
@@ -84,18 +85,14 @@ def audit_vault():
             
         # 3. Stale check
         verified_at = fm.get("verified_at", "")
-        months = utils.get_months_elapsed(verified_at) if hasattr(utils, "get_months_elapsed") else 0.0
-        # If months not defined in utils, calculate here
-        if not verified_at:
-            months = 0.0
-        else:
+        months = 0.0
+        if verified_at:
             try:
-                from datetime import datetime
                 vdate = datetime.strptime(verified_at[:10], "%Y-%m-%d")
-                delta = datetime.now() - vdate
+                delta = current_date - vdate
                 months = delta.days / 30.4375
             except Exception:
-                months = 0.0
+                pass
                 
         if months >= 3.0:
             stale_nodes.append((relpath, verified_at))
@@ -165,7 +162,6 @@ def audit_vault():
                 actions_taken.append(f"Removed broken edge {source_relpath} -> {target}")
 
     if actions_taken:
-        # Rebuild index and log operation
         utils.update_index(VAULT_DIR)
         utils.log_operation(VAULT_DIR, "organize-vault", "Vault Organization", "interactive", actions_taken)
         print("\nVault organized, index rebuilt, and actions logged.")
