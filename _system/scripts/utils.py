@@ -12,92 +12,81 @@ def parse_val(val_str):
     val_str = val_str.strip()
     if not val_str:
         return ""
-    if val_str.startswith('"') and val_str.endswith('"'):
-        return val_str[1:-1].replace('\\"', '"')
-    if val_str.startswith("'") and val_str.endswith("'"):
-        return val_str[1:-1]
+    
+    # Match quoted string: "value" or 'value'
+    m_str = re.match(r'^["\'](.*)["\']$', val_str)
+    if m_str:
+        return m_str.group(1).replace('\\"', '"')
+        
     if val_str == "true":
         return True
     if val_str == "false":
         return False
     if val_str == "[]":
         return []
-    if val_str.startswith('[') and val_str.endswith(']'):
-        inner = val_str[1:-1].strip()
+        
+    # Match inline list: [item1, item2, ...]
+    m_list = re.match(r'^\[(.*)\]$', val_str)
+    if m_list:
+        inner = m_list.group(1).strip()
         if not inner:
             return []
-        items = []
-        # simple split by comma, ignoring commas inside quotes
         parts = re.split(r',\s*(?=(?:[^"]*"[^"]*")*[^"]*$)', inner)
-        for x in parts:
-            items.append(parse_val(x.strip()))
-        return items
-    try:
-        if '.' in val_str:
-            return float(val_str)
+        return [parse_val(x) for x in parts]
+        
+    # Match numeric values
+    if re.match(r'^-?\d+\.\d+$', val_str):
+        return float(val_str)
+    if re.match(r'^-?\d+$', val_str):
         return int(val_str)
-    except ValueError:
-        return val_str
+        
+    return val_str
 
 def parse_frontmatter(content):
     match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
     if not match:
         return None, content
-    fm_text = match.group(1)
+    fm_text = match.group(1).replace('\r', '')
     body = content[match.end():]
     
+    # Match all top-level keys
+    top_level_matches = list(re.finditer(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$', fm_text, re.MULTILINE))
+    
     fm = {}
-    lines = fm_text.split('\n')
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        if not line.strip() or line.strip().startswith('#'):
-            i += 1
-            continue
-        parts = line.split(':', 1)
-        if len(parts) == 2:
-            key = parts[0].strip()
-            val_str = parts[1].strip()
-            # Check if this is the start of a block list (e.g. edges or list of items)
-            if val_str == "" and i + 1 < len(lines) and (lines[i+1].strip().startswith('-') or lines[i+1].startswith('  ')):
-                items = []
-                i += 1
-                list_lines = []
-                while i < len(lines) and (lines[i].startswith('  ') or lines[i].startswith('\t') or not lines[i].strip() or lines[i].strip().startswith('-')):
-                    if lines[i].strip() and not lines[i].startswith(' ') and not lines[i].startswith('\t') and not lines[i].strip().startswith('-'):
-                        break
-                    list_lines.append(lines[i])
-                    i += 1
-                i -= 1
-                
-                current_dict = None
-                for l in list_lines:
-                    l_strip = l.strip()
-                    if not l_strip or l_strip.startswith('#'):
-                        continue
-                    if l_strip.startswith('-'):
-                        item_val = l_strip[1:].strip()
-                        is_key_value = bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_-]*\s*:(?:\s|$)', item_val))
-                        if is_key_value:
-                            current_dict = {}
-                            items.append(current_dict)
-                            s_parts = item_val.split(':', 1)
-                            current_dict[s_parts[0].strip()] = parse_val(s_parts[1].strip())
-                        elif item_val == "":
-                            current_dict = {}
-                            items.append(current_dict)
-                        else:
-                            current_dict = None
-                            items.append(parse_val(item_val))
+    for idx, m in enumerate(top_level_matches):
+        key = m.group(1)
+        val_inline = m.group(2).strip()
+        
+        start_pos = m.end()
+        end_pos = top_level_matches[idx + 1].start() if idx + 1 < len(top_level_matches) else len(fm_text)
+        block_text = fm_text[start_pos:end_pos].strip()
+        
+        if val_inline:
+            fm[key] = parse_val(val_inline)
+        elif block_text:
+            items = []
+            for line in block_text.split('\n'):
+                line_strip = line.strip()
+                if not line_strip or line_strip.startswith('#'):
+                    continue
+                if line_strip.startswith('-'):
+                    item_val = line_strip[1:].strip()
+                    m_kv = re.match(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$', item_val)
+                    if m_kv:
+                        d = {m_kv.group(1): parse_val(m_kv.group(2))}
+                        items.append(d)
+                    elif not item_val:
+                        items.append({})
                     else:
-                        if current_dict is not None:
-                            s_parts = l_strip.split(':', 1)
-                            if len(s_parts) == 2:
-                                current_dict[s_parts[0].strip()] = parse_val(s_parts[1].strip())
-                fm[key] = items
-            else:
-                fm[key] = parse_val(val_str)
-        i += 1
+                        items.append(parse_val(item_val))
+                else:
+                    m_kv = re.match(r'^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$', line_strip)
+                    if m_kv and items and isinstance(items[-1], dict):
+                        items[-1][m_kv.group(1)] = parse_val(m_kv.group(2))
+            fm[key] = items
+        else:
+            fm[key] = ""
+            
     return fm, body
 
 def dump_frontmatter(fm):
