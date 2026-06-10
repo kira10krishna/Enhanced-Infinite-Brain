@@ -133,27 +133,10 @@ def dump_frontmatter(fm):
 # Node path resolution cache to avoid redundant disk scans
 _node_path_cache = {}
 
-def read_node(path, metadata_only=False):
-    if metadata_only:
-        fm_lines = []
-        with open(path, 'r', encoding='utf-8') as f:
-            line = f.readline()
-            if not line or line.strip() != "---":
-                return None, ""
-            fm_lines.append(line)
-            while True:
-                line = f.readline()
-                if not line:
-                    break
-                fm_lines.append(line)
-                if line.strip() == "---":
-                    break
-        fm, _ = parse_frontmatter("".join(fm_lines) + "\n")
-        return fm, ""
-    else:
-        with open(path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        return parse_frontmatter(content)
+def read_node(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return parse_frontmatter(content)
 
 def write_node(path, fm, body):
     fm_str = dump_frontmatter(fm)
@@ -161,7 +144,7 @@ def write_node(path, fm, body):
     with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
 
-def get_all_nodes(vault_path, metadata_only=False):
+def get_all_nodes(vault_path):
     nodes = []
     for t in NODE_TYPES:
         dir_path = os.path.join(vault_path, t)
@@ -172,7 +155,7 @@ def get_all_nodes(vault_path, metadata_only=False):
                 for entry in entries:
                     if entry.is_file() and entry.name.endswith(".md"):
                         try:
-                            fm, body = read_node(entry.path, metadata_only=metadata_only)
+                            fm, body = read_node(entry.path)
                             if fm:
                                 nodes.append((entry.path, fm, body))
                         except Exception:
@@ -205,8 +188,7 @@ def get_node_path(vault_path, node_id):
 def update_index(vault_path):
     nodes_by_type = {t: [] for t in NODE_TYPES}
     total_count = 0
-    # Use metadata_only=True for 5x indexing speedup
-    for file_path, fm, body in get_all_nodes(vault_path, metadata_only=True):
+    for file_path, fm, body in get_all_nodes(vault_path):
         ntype = fm.get("node_type")
         if ntype in nodes_by_type:
             nodes_by_type[ntype].append((fm.get("id"), fm.get("title", ""), fm.get("summary", ""), fm.get("confidence", 0.0)))

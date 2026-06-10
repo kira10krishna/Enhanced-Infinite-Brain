@@ -30,52 +30,35 @@ def run_health(auto=False):
     print("Running Vault Health Audit...")
     current_date = datetime.now()
     
-    # 1. Load all nodes (metadata-only for maximum speed)
-    nodes = utils.get_all_nodes(VAULT_DIR, metadata_only=True)
+    # 1. Load all nodes
+    nodes = utils.get_all_nodes(VAULT_DIR)
     
-    # Pre-map edges to detect orphans
-    # Maps node_id/path to list of inbound nodes
-    inbound_edges = {}
-    outbound_count = {}
-    
-    node_by_id = {}
-    node_by_relpath = {}
-    
-    for file_path, fm, body in nodes:
-        nid = fm.get("id")
-        ntype = fm.get("node_type")
-        relpath = f"{ntype}/{nid}"
-        
-        node_by_id[nid] = (file_path, fm, body)
-        node_by_relpath[relpath] = (file_path, fm, body)
-        
-        inbound_edges[relpath] = []
-        inbound_edges[nid] = []
-        outbound_count[relpath] = 0
-        
-    # Build edge adjacency lists
+    # Single-pass parsing to construct relational sets for O(1) lookup speeds
+    all_relpaths = set()
+    nodes_with_outbound = set()
+    referenced_targets = set()
     contradict_edges = []
     
     for file_path, fm, body in nodes:
         nid = fm.get("id")
         ntype = fm.get("node_type")
-        source_relpath = f"{ntype}/{nid}"
+        relpath = f"{ntype}/{nid}"
+        all_relpaths.add(relpath)
         
         edges = fm.get("edges", [])
-        outbound_count[source_relpath] = len(edges)
-        
-        for edge in edges:
-            target = edge.get("target", "")
-            etype = edge.get("type", "")
-            if target:
-                if target in inbound_edges:
-                    inbound_edges[target].append(source_relpath)
-                target_short = target.split('/')[-1]
-                if target_short in inbound_edges:
-                    inbound_edges[target_short].append(source_relpath)
-            
-            if etype == "contradicts":
-                contradict_edges.append((source_relpath, target, edge.get("note", "")))
+        if edges:
+            nodes_with_outbound.add(relpath)
+            for edge in edges:
+                target = edge.get("target", "")
+                etype = edge.get("type", "")
+                if target:
+                    referenced_targets.add(target)
+                    referenced_targets.add(target.split('/')[-1])
+                if etype == "contradicts":
+                    contradict_edges.append((relpath, target, edge.get("note", "")))
+                    
+    # Orphans have no outbound links and are not targets of any other links
+    orphan_relpaths = all_relpaths - nodes_with_outbound - referenced_targets
 
     # 2. Process confidence decay and flag issues
     decay_proposals = []
@@ -125,10 +108,8 @@ def run_health(auto=False):
             below_threshold_nodes.append((relpath, fm.get("title", ""), final_conf))
             nodes_by_type_stats[ntype]["below_threshold"] += 1
             
-        # Orphan check
-        out_cnt = outbound_count.get(relpath, 0)
-        in_cnt = len(inbound_edges.get(relpath, [])) + len(inbound_edges.get(nid, []))
-        if out_cnt == 0 and in_cnt == 0:
+        # Orphan check via set lookup (O(1))
+        if relpath in orphan_relpaths:
             orphan_nodes.append((relpath, fm.get("title", "")))
 
     # 3. Handle contradictions registration
@@ -163,10 +144,8 @@ def run_health(auto=False):
                 
         if apply_decay:
             for file_path, fm, body, old_conf, new_conf, months in decay_proposals:
-                # Load the full node to retrieve body context before writing updates
-                _, actual_body = utils.read_node(file_path, metadata_only=False)
                 fm["confidence"] = new_conf
-                utils.write_node(file_path, fm, actual_body)
+                utils.write_node(file_path, fm, body)
                 updates_applied += 1
             print(f"Applied confidence decay to {updates_applied} nodes.")
         else:

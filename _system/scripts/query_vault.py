@@ -27,15 +27,17 @@ def extract_keywords(query):
     query_clean = RE_CLEAN_QUERY.sub(' ', query.lower())
     words = query_clean.split()
     keywords = [w for w in words if w not in STOPWORDS and len(w) > 1]
-    return keywords if keywords else words
+    keywords = list(dict.fromkeys(keywords))
+    return keywords if keywords else list(dict.fromkeys(words))
 
 def score_node(fm, keywords):
-    score = 0.0
     nid = fm.get("id", "").lower()
     title = fm.get("title", "").lower()
     summary = fm.get("summary", "").lower()
     tags = [t.lower() for t in fm.get("tags", []) if isinstance(t, str)]
+    confidence = fm.get("confidence", 0.0)
     
+    score = 0.0
     for kw in keywords:
         if kw in title:
             score += 3.0
@@ -43,14 +45,12 @@ def score_node(fm, keywords):
                 score += 1.0
         if kw in nid:
             score += 2.0
-        for tag in tags:
-            if kw in tag:
-                score += 1.5
+        if tags:
+            score += sum(1.5 for tag in tags if kw in tag)
         if kw in summary:
             score += 1.0
             
-    score *= (0.5 + fm.get("confidence", 0.0) * 0.5)
-    return score
+    return score * (0.5 + confidence * 0.5)
 
 def run_query(query, limit=5):
     print(f"Query: \"{query}\"\n")
@@ -101,6 +101,14 @@ def run_query(query, limit=5):
         # Fallback to loading all nodes from disk if INDEX.md is missing/empty
         print("Warning: INDEX.md is empty or missing. Falling back to disk scan...")
         nodes = utils.get_all_nodes(VAULT_DIR)
+        
+        # Pre-populate get_node_path cache
+        for file_path, fm, body in nodes:
+            nid = fm.get("id")
+            ntype = fm.get("node_type")
+            utils._node_path_cache[(VAULT_DIR, nid)] = file_path
+            utils._node_path_cache[(VAULT_DIR, f"{ntype}/{nid}")] = file_path
+            
         scored_nodes = []
         for file_path, fm, body in nodes:
             score = score_node(fm, keywords)

@@ -249,10 +249,8 @@ def process_ingest(source_path, mode="supervised", json_payload_path=None):
         }
         
         # Ensure derived_from edge is present
-        has_derived = False
+        has_derived = any(e.get("type") == "derived_from" and e.get("target") == f"source/{source_id}" for e in fm["edges"])
         for e in fm["edges"]:
-            if e.get("type") == "derived_from" and e.get("target") == f"source/{source_id}":
-                has_derived = True
             if e.get("type") == "contradicts":
                 # register contradiction
                 target = e.get("target")
