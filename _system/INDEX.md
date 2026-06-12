@@ -1,7 +1,7 @@
 # Knowledge Graph Index
 
 > Last updated: 2026-06-11
-> Total nodes: 2
+> Total nodes: 5
 
 ---
 
@@ -13,6 +13,7 @@ _No nodes yet._
 
 ## Concepts
 - [[concept/attention-mechanism-power|The Power of the Attention Mechanism in Modern AI]] `concept` — Explains how the attention mechanism has revolutionized deep learning, particularly NLP. (conf: 0.85)
+- [[concept/extracted-note|Extracted Note]] `concept` — --- title: "AI 2027" source: "https://ai-2027.com/" author: published: created: 2026-06-11 descripti... (conf: 0.7)
 
 ## Questions
 _No nodes yet._
@@ -36,7 +37,9 @@ _No nodes yet._
 _No nodes yet._
 
 ## Sources
+- [[source/ai-2027|AI-2027.md]] `source` — Raw source material processed on 2026-06-11. (conf: 0.9)
 - [[source/attention-mechanism-intro|attention-mechanism-intro.md]] `source` — Raw source material processed on 2026-06-11. (conf: 0.9)
+- [[source/pasted-raw-text|Pasted Raw Text]] `source` — Raw source material processed on 2026-06-11. (conf: 0.9)
 
 ## Bookmarks
 _No nodes yet._

@@ -6,6 +6,29 @@ All vault operations are recorded here in reverse-chronological order (newest fi
 
 ---
 
+## [2026-06-11] convert-note | "Ingest: AI-2027.md" | mode=supervised
+- Ingested source: "AI-2027.md"
+- Created nodes: concept/extracted-note
+- Contradictions registered: None
+- Ingestion mode: supervised
+
+## [2026-06-11] convert-note | "Ingest: Pasted Raw Text" | mode=supervised
+- Ingested source: "Pasted Raw Text"
+- Created nodes: note/my-clipped-note
+- Contradictions registered: None
+- Ingestion mode: supervised
+
+## [2026-06-11] query-vault | "Query: attention..." | mode=auto
+- Query: "attention"
+- Keywords extracted: ['attention']
+- Retrieved 2 nodes for context
+
+## [2026-06-11] vault-health | "Vault Health Audit" | mode=auto
+- Scan complete: 2 nodes audited
+- Confidence decay applied to 0 nodes
+- Detected 0 orphans and 0 stale nodes
+- Health report updated at `_system/HEALTH-REPORT.md`
+
 ## [2026-06-11] query-vault | "Query: What is the attention mechanis..." | mode=auto
 - Query: "What is the attention mechanism?"
 - Keywords extracted: ['attention', 'mechanism']
