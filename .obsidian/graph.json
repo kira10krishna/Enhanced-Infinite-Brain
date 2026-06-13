@@ -7,32 +7,129 @@
   "showOrphans": true,
   "collapse-color-groups": false,
   "colorGroups": [
-    { "query": "path:\"pillar/\"",    "color": { "a": 1, "rgb": 16098851 } },
-    { "query": "path:\"concept/\"",   "color": { "a": 1, "rgb": 4886745  } },
-    { "query": "path:\"fact/\"",      "color": { "a": 1, "rgb": 2600544  } },
-    { "query": "path:\"hypothesis/\"","color": { "a": 1, "rgb": 15105570 } },
-    { "query": "path:\"pattern/\"",   "color": { "a": 1, "rgb": 9323693  } },
-    { "query": "path:\"decision/\"",  "color": { "a": 1, "rgb": 12597547 } },
-    { "query": "path:\"event/\"",     "color": { "a": 1, "rgb": 15277708 } },
-    { "query": "path:\"question/\"",  "color": { "a": 1, "rgb": 1482885  } },
-    { "query": "path:\"source/\"",    "color": { "a": 1, "rgb": 8357005  } },
-    { "query": "path:\"contact/\"",   "color": { "a": 1, "rgb": 2719929  } },
-    { "query": "path:\"note/\"",      "color": { "a": 1, "rgb": 9807270  } },
-    { "query": "path:\"bookmark/\"",  "color": { "a": 1, "rgb": 15965202 } },
-    { "query": "path:\"task/\"",      "color": { "a": 1, "rgb": 15158332 } },
-    { "query": "path:\"playbook/\"",  "color": { "a": 1, "rgb": 1752220  } },
-    { "query": "path:\"reference/\"", "color": { "a": 1, "rgb": 3426654  } },
-    { "query": "path:\"custom/\"",    "color": { "a": 1, "rgb": 13849600 } }
+    {
+      "query": "path:\"pillar/\"",
+      "color": {
+        "a": 1,
+        "rgb": 16098851
+      }
+    },
+    {
+      "query": "path:\"concept/\"",
+      "color": {
+        "a": 1,
+        "rgb": 4886745
+      }
+    },
+    {
+      "query": "path:\"fact/\"",
+      "color": {
+        "a": 1,
+        "rgb": 2600544
+      }
+    },
+    {
+      "query": "path:\"hypothesis/\"",
+      "color": {
+        "a": 1,
+        "rgb": 15105570
+      }
+    },
+    {
+      "query": "path:\"pattern/\"",
+      "color": {
+        "a": 1,
+        "rgb": 9323693
+      }
+    },
+    {
+      "query": "path:\"decision/\"",
+      "color": {
+        "a": 1,
+        "rgb": 12597547
+      }
+    },
+    {
+      "query": "path:\"event/\"",
+      "color": {
+        "a": 1,
+        "rgb": 15277708
+      }
+    },
+    {
+      "query": "path:\"question/\"",
+      "color": {
+        "a": 1,
+        "rgb": 1482885
+      }
+    },
+    {
+      "query": "path:\"source/\"",
+      "color": {
+        "a": 1,
+        "rgb": 8357005
+      }
+    },
+    {
+      "query": "path:\"contact/\"",
+      "color": {
+        "a": 1,
+        "rgb": 2719929
+      }
+    },
+    {
+      "query": "path:\"note/\"",
+      "color": {
+        "a": 1,
+        "rgb": 9807270
+      }
+    },
+    {
+      "query": "path:\"bookmark/\"",
+      "color": {
+        "a": 1,
+        "rgb": 15965202
+      }
+    },
+    {
+      "query": "path:\"task/\"",
+      "color": {
+        "a": 1,
+        "rgb": 15158332
+      }
+    },
+    {
+      "query": "path:\"playbook/\"",
+      "color": {
+        "a": 1,
+        "rgb": 1752220
+      }
+    },
+    {
+      "query": "path:\"reference/\"",
+      "color": {
+        "a": 1,
+        "rgb": 3426654
+      }
+    },
+    {
+      "query": "path:\"custom/\"",
+      "color": {
+        "a": 1,
+        "rgb": 13849600
+      }
+    }
   ],
   "collapse-display": false,
   "showArrow": true,
   "textFadeMultiplier": 0,
   "nodeSizeMultiplier": 1.2,
   "lineSizeMultiplier": 1,
+  "collapse-forces": true,
   "centerStrength": 0.5,
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 50,
   "scale": 1,
-  "close": false
+  "close": true
 }
