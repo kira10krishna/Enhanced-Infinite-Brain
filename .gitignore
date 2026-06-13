@@ -1,1 +1,11 @@
+# Obsidian session state (machine-specific, changes constantly)
 .obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# Plugin binaries — installed by Obsidian, not tracked
+# Settings (data.json) ARE tracked so config travels with the repo
+.obsidian/plugins/*/main.js
+.obsidian/plugins/*/styles.css
+
+# OS
+.DS_Store

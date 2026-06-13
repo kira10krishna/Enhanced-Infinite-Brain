@@ -1,1 +1,7 @@
-{}
+{
+  "attachmentFolderPath": "raw/assets",
+  "newFileFolderPath": "note",
+  "useMarkdownLinks": false,
+  "newLinkFormat": "shortest",
+  "showUnsupportedFiles": false
+}
